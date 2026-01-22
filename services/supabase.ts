@@ -29,8 +29,8 @@ const getEnv = (key: string, viteKey: string) => {
 const DEFAULT_URL = 'https://gljcfyyiqbriuappruox.supabase.co';
 const DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsamNmeXlpcWJyaXVhcHBydW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg2NjI5MTgsImV4cCI6MjA4NDIzODkxOH0.GSZUaVlce4iFJJb9ShGnLfDxFz3bWFC0aSJzeTSth0s';
 
-const envUrl = getEnv('REACT_APP_SUPABASE_URL', 'VITE_SUPABASE_URL');
-const envKey = getEnv('REACT_APP_SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY');
+const envUrl = getEnv('REACT_APP_SUPABASE_URL', 'CLIENT_SUPABASE_URL');
+const envKey = getEnv('REACT_APP_SUPABASE_ANON_KEY', 'CLIENT_SUPABASE_ANON_KEY');
 
 // Gunakan Env Var jika ada, jika tidak gunakan Default
 const SUPABASE_URL = envUrl || DEFAULT_URL;
