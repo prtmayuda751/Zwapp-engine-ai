@@ -125,6 +125,24 @@ export const NanoBananaEditForm: React.FC<NanoBananaEditFormProps> = ({ onSubmit
         Edit and transform images using AI (up to 10 images, max 10MB each)
       </div>
 
+      {creditLevel === 'danger' && (
+        <div className="bg-red-950/30 border border-red-700 p-3 rounded text-xs text-red-300 font-mono">
+          ⚠️ INSUFFICIENT CREDITS: You need {creditCost} credits but only have {userCredits}.
+        </div>
+      )}
+
+      {creditLevel === 'warning' && (
+        <div className="bg-yellow-950/30 border border-yellow-700 p-3 rounded text-xs text-yellow-300 font-mono">
+          ⚠️ LOW CREDITS: You have {userCredits} credits. Cost: {creditCost} credits.
+        </div>
+      )}
+
+      {creditLevel === 'safe' && creditCost > 0 && (
+        <div className="bg-green-950/30 border border-green-700 p-3 rounded text-xs text-green-300 font-mono">
+          ✓ Credits OK: {userCredits} available. Cost: {creditCost} credits.
+        </div>
+      )}
+
       <div>
         <label className={labelClass}>Prompt *</label>
         <textarea

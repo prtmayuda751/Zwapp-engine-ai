@@ -95,6 +95,16 @@ const App: React.FC = () => {
       setApiKey(key);
       localStorage.setItem('kie_api_key', key);
       addLog('System Configuration Updated: API Key Saved.');
+      // Immediately refresh credits after saving API key
+      setCreditsLoading(true);
+      fetchUserCredits(key).then(credits => {
+        setTotalCredits(credits);
+        setCreditsLoading(false);
+        addLog(`Credits synchronized: ${credits} available.`);
+      }).catch(error => {
+        console.error('Failed to sync credits:', error);
+        setCreditsLoading(false);
+      });
   };
 
   const handleLogout = async () => {
@@ -474,7 +484,7 @@ const App: React.FC = () => {
                     <ImageEditForm onSubmit={handleCreateTask} isLoading={isSubmitting} apiKey={apiKey} userCredits={totalCredits} />
                 )}
                 {activeModule === 'z-image' && (
-                    <ZImageForm onSubmit={handleCreateTask} isLoading={isSubmitting} />
+                    <ZImageForm onSubmit={handleCreateTask} isLoading={isSubmitting} apiKey={apiKey} userCredits={totalCredits} />
                 )}
                 </div>
 

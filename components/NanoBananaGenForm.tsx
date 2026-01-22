@@ -52,21 +52,21 @@ export const NanoBananaGenForm: React.FC<NanoBananaGenFormProps> = ({ onSubmit, 
         Generate images from text descriptions
       </div>
 
-      {creditLevel === 'critical' && (
+      {creditLevel === 'danger' && (
         <div className="bg-red-950/30 border border-red-700 p-3 rounded text-xs text-red-300 font-mono">
-          ⚠️ CRITICAL: Insufficient credits ({userCredits}). Cost: {creditCost} credits.
+          ⚠️ INSUFFICIENT CREDITS: You need {creditCost} credits but only have {userCredits}.
         </div>
       )}
 
       {creditLevel === 'warning' && (
         <div className="bg-yellow-950/30 border border-yellow-700 p-3 rounded text-xs text-yellow-300 font-mono">
-          ⚠️ WARNING: Low credits ({userCredits}). Cost: {creditCost} credits.
+          ⚠️ LOW CREDITS: You have {userCredits} credits. Cost: {creditCost} credits.
         </div>
       )}
 
-      {creditLevel === 'ok' && creditCost > 0 && (
+      {creditLevel === 'safe' && creditCost > 0 && (
         <div className="bg-green-950/30 border border-green-700 p-3 rounded text-xs text-green-300 font-mono">
-          ✓ Credits available ({userCredits}). Cost: {creditCost} credits.
+          ✓ Credits OK: {userCredits} available. Cost: {creditCost} credits.
         </div>
       )}
 

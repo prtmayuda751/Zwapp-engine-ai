@@ -43,23 +43,75 @@ export const formatCredits = (credits: number): string => {
  * Fetch user's current credit balance from KIE.AI
  */
 export const fetchUserCredits = async (apiKey: string): Promise<number> => {
+  if (!apiKey || apiKey.trim() === '') {
+    return 0;
+  }
+
   try {
-    const response = await fetch('/api/proxy', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+    // Try primary endpoint: user info
+    try {
+      const response = await fetch('https://api.kie.ai/v1/user/info', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const credits = data.data?.balance ?? data.data?.credits ?? data.balance ?? data.credits ?? 0;
+        console.log('[Credits] Fetched from /v1/user/info:', credits);
+        return credits;
+      }
+    } catch (e) {
+      console.log('[Credits] Primary endpoint failed, trying alternatives...');
     }
-    
-    const data = await response.json();
-    return data.data?.credits ?? 0;
+
+    // Try alternative endpoint: user profile/account
+    try {
+      const response = await fetch('https://api.kie.ai/v1/user', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const credits = data.data?.balance ?? data.data?.credits ?? data.balance ?? data.credits ?? 0;
+        console.log('[Credits] Fetched from /v1/user:', credits);
+        return credits;
+      }
+    } catch (e) {
+      console.log('[Credits] Alternative endpoint 1 failed...');
+    }
+
+    // Try account endpoint
+    try {
+      const response = await fetch('https://api.kie.ai/v1/account', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const credits = data.data?.balance ?? data.data?.credits ?? data.balance ?? data.credits ?? 0;
+        console.log('[Credits] Fetched from /v1/account:', credits);
+        return credits;
+      }
+    } catch (e) {
+      console.log('[Credits] Alternative endpoint 2 failed...');
+    }
+
+    console.warn('[Credits] All endpoints exhausted, returning 0');
+    return 0;
   } catch (error) {
-    console.error('Failed to fetch credits:', error);
+    console.error('[Credits] Fatal error fetching credits:', error);
     return 0;
   }
 };

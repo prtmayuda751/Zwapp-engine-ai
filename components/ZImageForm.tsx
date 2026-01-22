@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
 import { ZImageInput } from '../types';
 import { Button } from './ui/Button';
+import { getCreditCost, getCreditWarningLevel } from '../services/credits';
 
 interface ZImageFormProps {
   onSubmit: (input: ZImageInput) => void;
   isLoading: boolean;
+  apiKey?: string;
+  userCredits?: number;
 }
 
-export const ZImageForm: React.FC<ZImageFormProps> = ({ onSubmit, isLoading }) => {
+export const ZImageForm: React.FC<ZImageFormProps> = ({ onSubmit, isLoading, apiKey = '', userCredits = 0 }) => {
+  const creditCost = getCreditCost('z-image');
+  const creditLevel = getCreditWarningLevel(userCredits, creditCost);
   const [formData, setFormData] = useState<ZImageInput>({
     prompt: '',
     aspect_ratio: '1:1',
@@ -49,6 +54,24 @@ export const ZImageForm: React.FC<ZImageFormProps> = ({ onSubmit, isLoading }) =
         <h3 className="text-sm font-bold text-orange-500 uppercase tracking-widest">Z-IMAGE GENERATION</h3>
         <p className="text-[10px] text-zinc-500 mt-1">High-quality image synthesis with aspect ratio control</p>
       </div>
+
+      {creditLevel === 'danger' && (
+        <div className="bg-red-950/30 border border-red-700 p-3 rounded text-xs text-red-300 font-mono">
+          ⚠️ INSUFFICIENT CREDITS: You need {creditCost} credits but only have {userCredits}.
+        </div>
+      )}
+
+      {creditLevel === 'warning' && (
+        <div className="bg-yellow-950/30 border border-yellow-700 p-3 rounded text-xs text-yellow-300 font-mono">
+          ⚠️ LOW CREDITS: You have {userCredits} credits. Cost: {creditCost} credits.
+        </div>
+      )}
+
+      {creditLevel === 'safe' && creditCost > 0 && (
+        <div className="bg-green-950/30 border border-green-700 p-3 rounded text-xs text-green-300 font-mono">
+          ✓ Credits OK: {userCredits} available. Cost: {creditCost} credits.
+        </div>
+      )}
 
       {/* Error Message */}
       {error && (
