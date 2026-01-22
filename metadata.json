@@ -1,0 +1,5 @@
+{
+  "name": "Kie AI Interface",
+  "description": "Industrial-themed interface for the Kling 2.6 Motion Control and Nano Banana Pro APIs.",
+  "requestFramePermissions": []
+}
