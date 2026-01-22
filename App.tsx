@@ -3,7 +3,9 @@ import { createTask, queryTask } from './services/api';
 import { supabase, signOut } from './services/supabase';
 import { MotionControlInput, NanoBananaInput, ImageEditInput, ZImageInput, LocalTask } from './types';
 import { TaskForm } from './components/TaskForm';
-import { NanoBananaForm } from './components/NanoBananaForm';
+import { NanoBananaGenForm } from './components/NanoBananaGenForm';
+import { NanoBananaEditForm } from './components/NanoBananaEditForm';
+import { NanoBananaProForm } from './components/NanoBananaProForm';
 import { ImageEditForm } from './components/ImageEditForm';
 import { ZImageForm } from './components/ZImageForm';
 import { StatusTerminal } from './components/StatusTerminal';
@@ -11,7 +13,8 @@ import { QueueList } from './components/QueueList';
 import { AuthForm } from './components/AuthForm';
 import { SettingsModal } from './components/SettingsModal';
 
-type ModuleType = 'motion-control' | 'nano-banana' | 'image-edit' | 'z-image';
+type ModuleType = 'motion-control' | 'nano-banana-gen' | 'nano-banana-edit' | 'nano-banana-pro' | 'image-edit' | 'z-image';
+type NanoBananaType = 'gen' | 'edit' | 'pro';
 
 const App: React.FC = () => {
   // Auth State
@@ -26,6 +29,8 @@ const App: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeModule, setActiveModule] = useState<ModuleType>('motion-control');
   const [expandImageGen, setExpandImageGen] = useState(false);
+  const [expandNano, setExpandNano] = useState(false);
+  const [nanoBananaType, setNanoBananaType] = useState<NanoBananaType>('gen');
   
   // UI State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -82,7 +87,9 @@ const App: React.FC = () => {
     
     let modelName = '';
     if (activeModule === 'motion-control') modelName = 'kling-2.6/motion-control';
-    else if (activeModule === 'nano-banana') modelName = 'nano-banana-pro';
+    else if (activeModule === 'nano-banana-gen') modelName = 'google/nano-banana';
+    else if (activeModule === 'nano-banana-edit') modelName = 'google/nano-banana-edit';
+    else if (activeModule === 'nano-banana-pro') modelName = 'nano-banana-pro';
     else if (activeModule === 'image-edit') modelName = 'qwen/image-edit';
     else if (activeModule === 'z-image') modelName = 'z-image';
 
@@ -289,7 +296,65 @@ const App: React.FC = () => {
                         Motion Control
                     </button>
 
-                    {/* Second Row: Image Generation Parent + Submenu */}
+                    {/* Second Row: Nano Banana Parent + Submenu */}
+                    <button
+                        onClick={() => setExpandNano(!expandNano)}
+                        className={`w-full py-2 text-xs font-bold uppercase tracking-wider transition-all text-center flex items-center justify-between px-3 ${
+                            expandNano 
+                            ? 'bg-zinc-800 text-orange-500 border border-zinc-700' 
+                            : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                    >
+                        <span>Nano Banana</span>
+                        <span className="text-[10px]">{expandNano ? '▼' : '▶'}</span>
+                    </button>
+
+                    {/* Submenu - Nano Banana Children */}
+                    {expandNano && (
+                        <div className="flex gap-1 p-1 border-t border-zinc-700 bg-zinc-950">
+                            <button
+                                onClick={() => {
+                                    setActiveModule('nano-banana-gen');
+                                    setNanoBananaType('gen');
+                                }}
+                                className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                                    activeModule === 'nano-banana-gen' 
+                                    ? 'bg-green-700 text-white border border-green-600 shadow-inner' 
+                                    : 'text-zinc-600 hover:text-zinc-400 border border-transparent'
+                                }`}
+                            >
+                                Gen
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setActiveModule('nano-banana-edit');
+                                    setNanoBananaType('edit');
+                                }}
+                                className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                                    activeModule === 'nano-banana-edit' 
+                                    ? 'bg-blue-700 text-white border border-blue-600 shadow-inner' 
+                                    : 'text-zinc-600 hover:text-zinc-400 border border-transparent'
+                                }`}
+                            >
+                                Edit
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setActiveModule('nano-banana-pro');
+                                    setNanoBananaType('pro');
+                                }}
+                                className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                                    activeModule === 'nano-banana-pro' 
+                                    ? 'bg-purple-700 text-white border border-purple-600 shadow-inner' 
+                                    : 'text-zinc-600 hover:text-zinc-400 border border-transparent'
+                                }`}
+                            >
+                                Pro
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Third Row: Image Generation Parent + Submenu */}
                     <button
                         onClick={() => setExpandImageGen(!expandImageGen)}
                         className={`w-full py-2 text-xs font-bold uppercase tracking-wider transition-all text-center flex items-center justify-between px-3 ${
@@ -307,18 +372,6 @@ const App: React.FC = () => {
                         <div className="flex gap-1 p-1 border-t border-zinc-700 bg-zinc-950">
                             <button
                                 onClick={() => {
-                                    setActiveModule('nano-banana');
-                                }}
-                                className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
-                                    activeModule === 'nano-banana' 
-                                    ? 'bg-zinc-700 text-orange-500 border border-zinc-600 shadow-inner' 
-                                    : 'text-zinc-600 hover:text-zinc-400 border border-transparent'
-                                }`}
-                            >
-                                Nano
-                            </button>
-                            <button
-                                onClick={() => {
                                     setActiveModule('image-edit');
                                 }}
                                 className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
@@ -327,7 +380,7 @@ const App: React.FC = () => {
                                     : 'text-zinc-600 hover:text-zinc-400 border border-transparent'
                                 }`}
                             >
-                                Edit
+                                Qwen Edit
                             </button>
                             <button
                                 onClick={() => {
@@ -348,8 +401,14 @@ const App: React.FC = () => {
                 {activeModule === 'motion-control' && (
                     <TaskForm onSubmit={handleCreateTask} isLoading={isSubmitting} />
                 )}
-                {activeModule === 'nano-banana' && (
-                    <NanoBananaForm onSubmit={handleCreateTask} isLoading={isSubmitting} />
+                {activeModule === 'nano-banana-gen' && (
+                    <NanoBananaGenForm onSubmit={handleCreateTask} isLoading={isSubmitting} />
+                )}
+                {activeModule === 'nano-banana-edit' && (
+                    <NanoBananaEditForm onSubmit={handleCreateTask} isLoading={isSubmitting} />
+                )}
+                {activeModule === 'nano-banana-pro' && (
+                    <NanoBananaProForm onSubmit={handleCreateTask} isLoading={isSubmitting} />
                 )}
                 {activeModule === 'image-edit' && (
                     <ImageEditForm onSubmit={handleCreateTask} isLoading={isSubmitting} />
@@ -361,15 +420,15 @@ const App: React.FC = () => {
 
                 {/* Right Col: Output & Queue */}
                 <div className="lg:col-span-7 flex flex-col gap-4">
-                {/* Active Task Detail */}
-                <StatusTerminal task={activeTask} logs={logs} />
-                
-                {/* Task Queue List */}
+                {/* Task Queue List - MOVED TO TOP */}
                 <QueueList 
                     tasks={tasks} 
                     onSelectTask={setSelectedTaskId} 
                     selectedTaskId={selectedTaskId} 
                 />
+                
+                {/* Active Task Detail & Output - MOVED TO BOTTOM */}
+                <StatusTerminal task={activeTask} logs={logs} />
                 </div>
             </div>
         </main>

@@ -6,13 +6,28 @@ export interface MotionControlInput {
   mode: '720p' | '1080p';
 }
 
-export interface NanoBananaInput {
+export interface NanoBananaGenInput {
+  prompt: string;
+  output_format: 'png' | 'jpeg';
+  image_size: '1:1' | '9:16' | '16:9' | '3:4' | '4:3' | '3:2' | '2:3' | '5:4' | '4:5' | '21:9' | 'auto';
+}
+
+export interface NanoBananaEditInput {
+  prompt: string;
+  image_urls: string[];
+  output_format: 'png' | 'jpeg';
+  image_size: '1:1' | '9:16' | '16:9' | '3:4' | '4:3' | '3:2' | '2:3' | '5:4' | '4:5' | '21:9' | 'auto';
+}
+
+export interface NanoBananaProInput {
   prompt: string;
   image_input: string[];
-  aspect_ratio: string;
-  resolution: string;
-  output_format: string;
+  aspect_ratio: '1:1' | '2:3' | '3:2' | '3:4' | '4:3' | '4:5' | '5:4' | '9:16' | '16:9' | '21:9' | 'auto';
+  resolution: '1K' | '2K' | '4K';
+  output_format: 'png' | 'jpg';
 }
+
+export type NanoBananaInput = NanoBananaGenInput | NanoBananaEditInput | NanoBananaProInput;
 
 export interface ImageEditInput {
   prompt: string;
