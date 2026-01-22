@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createTask, queryTask } from './services/api';
 import { supabase, signOut } from './services/supabase';
-import { MotionControlInput, NanoBananaInput, ImageEditInput, LocalTask } from './types';
+import { MotionControlInput, NanoBananaInput, ImageEditInput, ZImageInput, LocalTask } from './types';
 import { TaskForm } from './components/TaskForm';
 import { NanoBananaForm } from './components/NanoBananaForm';
 import { ImageEditForm } from './components/ImageEditForm';
+import { ZImageForm } from './components/ZImageForm';
 import { StatusTerminal } from './components/StatusTerminal';
 import { QueueList } from './components/QueueList';
 import { AuthForm } from './components/AuthForm';
 import { SettingsModal } from './components/SettingsModal';
 
-type ModuleType = 'motion-control' | 'nano-banana' | 'image-edit';
+type ModuleType = 'motion-control' | 'nano-banana' | 'image-edit' | 'z-image';
 
 const App: React.FC = () => {
   // Auth State
@@ -24,6 +25,7 @@ const App: React.FC = () => {
   const [logs, setLogs] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeModule, setActiveModule] = useState<ModuleType>('motion-control');
+  const [expandImageGen, setExpandImageGen] = useState(false);
   
   // UI State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -69,7 +71,7 @@ const App: React.FC = () => {
       setSession(null);
   };
 
-  const handleCreateTask = async (input: MotionControlInput | NanoBananaInput | ImageEditInput) => {
+  const handleCreateTask = async (input: MotionControlInput | NanoBananaInput | ImageEditInput | ZImageInput) => {
     if (!apiKey) {
         setIsSettingsOpen(true);
         addLog('ERROR: API Key missing. Please configure in Settings.');
@@ -82,6 +84,7 @@ const App: React.FC = () => {
     if (activeModule === 'motion-control') modelName = 'kling-2.6/motion-control';
     else if (activeModule === 'nano-banana') modelName = 'nano-banana-pro';
     else if (activeModule === 'image-edit') modelName = 'qwen/image-edit';
+    else if (activeModule === 'z-image') modelName = 'z-image';
 
     addLog(`Initiating generation sequence [${modelName}]...`);
     
@@ -140,54 +143,62 @@ const App: React.FC = () => {
 
     // Actual API Polling
     const apiPollId = window.setInterval(async () => {
-        const tasksToPoll = tasks.filter(t => t.state === 'waiting');
-        if (tasksToPoll.length === 0) return;
+        // Fetch current state
+        setTasks(prevTasks => {
+            const tasksToPoll = prevTasks.filter(t => t.state === 'waiting');
+            if (tasksToPoll.length === 0) return prevTasks;
 
-        const updates = await Promise.all(tasksToPoll.map(async (task) => {
-            try {
-                const res = await queryTask(apiKey, task.taskId);
-                if (res.code === 200) {
-                    return { taskId: task.taskId, data: res.data };
-                }
-            } catch (e: any) {
-                // Log error only once per few seconds to avoid spamming
-                if (Math.random() > 0.8) {
-                   console.error(`Polling error for ${task.taskId}:`, e.message);
-                }
-            }
-            return null;
-        }));
+            // Start async polling
+            (async () => {
+                const updates = await Promise.all(tasksToPoll.map(async (task) => {
+                    try {
+                        const res = await queryTask(apiKey, task.taskId);
+                        if (res.code === 200) {
+                            return { taskId: task.taskId, data: res.data };
+                        }
+                    } catch (e: any) {
+                        // Log error only once per few seconds to avoid spamming
+                        if (Math.random() > 0.8) {
+                           console.error(`Polling error for ${task.taskId}:`, e.message);
+                        }
+                    }
+                    return null;
+                }));
 
-        // Update State
-        setTasks(prev => prev.map(t => {
-            const update = updates.find(u => u && u.taskId === t.taskId);
-            
-            if (update && update.data) {
-                const newState = update.data.state;
-                // If success/fail, jump to 100%. If waiting, keep simulated progress.
-                const newProgress = (newState === 'success' || newState === 'fail') ? 100 : t.progress;
-                
-                if (newState !== t.state) {
-                    addLog(`Task ${t.taskId.slice(-4)} updated: ${t.state} -> ${newState}`);
-                }
+                // Update State with fetched data
+                setTasks(prev => prev.map(t => {
+                    const update = updates.find(u => u && u.taskId === t.taskId);
+                    
+                    if (update && update.data) {
+                        const newState = update.data.state;
+                        // If success/fail, jump to 100%. If waiting, keep simulated progress.
+                        const newProgress = (newState === 'success' || newState === 'fail') ? 100 : t.progress;
+                        
+                        if (newState !== t.state) {
+                            addLog(`Task ${t.taskId.slice(-4)} updated: ${t.state} -> ${newState}`);
+                        }
 
-                return {
-                    ...t,
-                    ...update.data,
-                    state: newState,
-                    progress: newProgress,
-                };
-            }
-            return t;
-        }));
+                        return {
+                            ...t,
+                            ...update.data,
+                            state: newState,
+                            progress: newProgress,
+                            resultJson: update.data.resultJson || t.resultJson,
+                        };
+                    }
+                    return t;
+                }));
+            })();
 
+            return prevTasks;
+        });
     }, 3000); // Check every 3 seconds
 
     return () => {
         clearInterval(apiPollId);
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
-  }, [tasks, apiKey, session]);
+  }, [apiKey, session]);
 
   const activeTask = tasks.find(t => t.taskId === selectedTaskId) || tasks[0] || null;
 
@@ -264,38 +275,74 @@ const App: React.FC = () => {
                 {/* Left Col: Controls */}
                 <div className="lg:col-span-5 flex flex-col gap-4">
                 
-                {/* Module Navigation */}
-                <div className="flex bg-zinc-900 border border-zinc-800 p-1 gap-1">
+                {/* Module Navigation - Two Row Layout */}
+                <div className="flex flex-col gap-1 bg-zinc-900 border border-zinc-800 p-1">
+                    {/* First Row: Motion */}
                     <button
                         onClick={() => setActiveModule('motion-control')}
-                        className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                        className={`w-full py-2 text-xs font-bold uppercase tracking-wider transition-all text-center ${
                             activeModule === 'motion-control' 
                             ? 'bg-zinc-800 text-orange-500 border border-zinc-700 shadow-inner' 
                             : 'text-zinc-500 hover:text-zinc-300'
                         }`}
                     >
-                        Motion
+                        Motion Control
                     </button>
+
+                    {/* Second Row: Image Generation Parent + Submenu */}
                     <button
-                        onClick={() => setActiveModule('nano-banana')}
-                        className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
-                            activeModule === 'nano-banana' 
-                            ? 'bg-zinc-800 text-orange-500 border border-zinc-700 shadow-inner' 
+                        onClick={() => setExpandImageGen(!expandImageGen)}
+                        className={`w-full py-2 text-xs font-bold uppercase tracking-wider transition-all text-center flex items-center justify-between px-3 ${
+                            expandImageGen 
+                            ? 'bg-zinc-800 text-orange-500 border border-zinc-700' 
                             : 'text-zinc-500 hover:text-zinc-300'
                         }`}
                     >
-                        Nano
+                        <span>Image Generation</span>
+                        <span className="text-[10px]">{expandImageGen ? '▼' : '▶'}</span>
                     </button>
-                    <button
-                        onClick={() => setActiveModule('image-edit')}
-                        className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
-                            activeModule === 'image-edit' 
-                            ? 'bg-zinc-800 text-orange-500 border border-zinc-700 shadow-inner' 
-                            : 'text-zinc-500 hover:text-zinc-300'
-                        }`}
-                    >
-                        Edit
-                    </button>
+
+                    {/* Submenu - Image Generation Children */}
+                    {expandImageGen && (
+                        <div className="flex gap-1 p-1 border-t border-zinc-700 bg-zinc-950">
+                            <button
+                                onClick={() => {
+                                    setActiveModule('nano-banana');
+                                }}
+                                className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                                    activeModule === 'nano-banana' 
+                                    ? 'bg-zinc-700 text-orange-500 border border-zinc-600 shadow-inner' 
+                                    : 'text-zinc-600 hover:text-zinc-400 border border-transparent'
+                                }`}
+                            >
+                                Nano
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setActiveModule('image-edit');
+                                }}
+                                className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                                    activeModule === 'image-edit' 
+                                    ? 'bg-zinc-700 text-orange-500 border border-zinc-600 shadow-inner' 
+                                    : 'text-zinc-600 hover:text-zinc-400 border border-transparent'
+                                }`}
+                            >
+                                Edit
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setActiveModule('z-image');
+                                }}
+                                className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                                    activeModule === 'z-image' 
+                                    ? 'bg-zinc-700 text-orange-500 border border-zinc-600 shadow-inner' 
+                                    : 'text-zinc-600 hover:text-zinc-400 border border-transparent'
+                                }`}
+                            >
+                                Z-Image
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {activeModule === 'motion-control' && (
@@ -306,6 +353,9 @@ const App: React.FC = () => {
                 )}
                 {activeModule === 'image-edit' && (
                     <ImageEditForm onSubmit={handleCreateTask} isLoading={isSubmitting} />
+                )}
+                {activeModule === 'z-image' && (
+                    <ZImageForm onSubmit={handleCreateTask} isLoading={isSubmitting} />
                 )}
                 </div>
 

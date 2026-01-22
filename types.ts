@@ -29,9 +29,14 @@ export interface ImageEditInput {
   num_images?: string;
 }
 
+export interface ZImageInput {
+  prompt: string;
+  aspect_ratio: '1:1' | '4:3' | '3:4' | '16:9' | '9:16';
+}
+
 export interface CreateTaskRequest {
   model: string; 
-  input: MotionControlInput | NanoBananaInput | ImageEditInput;
+  input: MotionControlInput | NanoBananaInput | ImageEditInput | ZImageInput;
   callBackUrl?: string;
 }
 
