@@ -1,9 +1,44 @@
 import { createClient } from '@supabase/supabase-js';
 
 // KONFIGURASI SUPABASE
-// Ganti nilai di bawah ini dengan URL dan Anon Key dari Project Settings > API di Supabase Anda
-const SUPABASE_URL = 'https://gljcfyyiqbriuappruox.supabase.co'; 
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsamNmeXlpcWJyaXVhcHBydW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg2NjI5MTgsImV4cCI6MjA4NDIzODkxOH0.GSZUaVlce4iFJJb9ShGnLfDxFz3bWFC0aSJzeTSth0s'; 
+// Menggunakan Environment Variables untuk keamanan di Production (Vercel)
+// Mendukung format Vite (import.meta.env) dan Create-React-App (process.env)
+
+const getEnv = (key: string, viteKey: string) => {
+  try {
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[viteKey]) {
+      // @ts-ignore
+      return import.meta.env[viteKey];
+    }
+  } catch (e) { /* ignore */ }
+  
+  try {
+    // @ts-ignore
+    if (typeof process !== 'undefined' && process.env && process.env[key]) {
+      // @ts-ignore
+      return process.env[key];
+    }
+  } catch (e) { /* ignore */ }
+
+  return '';
+};
+
+// Default Fallbacks (agar tidak crash jika env var belum diset di Vercel)
+// Ini mencegah error "supabaseUrl is required" saat deploy jika variabel lingkungan belum diset
+const DEFAULT_URL = 'https://gljcfyyiqbriuappruox.supabase.co';
+const DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsamNmeXlpcWJyaXVhcHBydW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg2NjI5MTgsImV4cCI6MjA4NDIzODkxOH0.GSZUaVlce4iFJJb9ShGnLfDxFz3bWFC0aSJzeTSth0s';
+
+const envUrl = getEnv('REACT_APP_SUPABASE_URL', 'VITE_SUPABASE_URL');
+const envKey = getEnv('REACT_APP_SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY');
+
+// Gunakan Env Var jika ada, jika tidak gunakan Default
+const SUPABASE_URL = envUrl || DEFAULT_URL;
+const SUPABASE_ANON_KEY = envKey || DEFAULT_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error("FATAL ERROR: Supabase Configuration is missing/invalid.");
+}
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -46,7 +81,7 @@ export const uploadAsset = async (file: File): Promise<string> => {
 
     // 1. Generate unique filename
     const fileExt = file.name.split('.').pop();
-    // Use user ID in path for organization (optional but good practice)
+    // Use user ID in path for organization
     const fileName = `${user.id}/${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
     
     // 2. Upload to 'kie-assets' bucket
