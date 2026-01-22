@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import { NanoBananaEditInput } from '../types';
 import { Button } from './ui/Button';
 import { Dropzone } from './ui/Dropzone';
-import { uploadImageToSupabase, fileToDataURL } from '../services/imageUpload';
+import { uploadImageToKieAI, fileToDataURL } from '../services/kieFileUpload';
+import { getCreditCost, getCreditWarningLevel } from '../services/credits';
 
 interface NanoBananaEditFormProps {
   onSubmit: (input: NanoBananaEditInput) => void;
   isLoading: boolean;
+  apiKey?: string;
+  userCredits?: number;
 }
 
 interface ImagePreview {
@@ -16,7 +19,9 @@ interface ImagePreview {
   isUploading: boolean;
 }
 
-export const NanoBananaEditForm: React.FC<NanoBananaEditFormProps> = ({ onSubmit, isLoading }) => {
+export const NanoBananaEditForm: React.FC<NanoBananaEditFormProps> = ({ onSubmit, isLoading, apiKey = '', userCredits = 0 }) => {
+  const creditCost = getCreditCost('google/nano-banana-edit');
+  const creditLevel = getCreditWarningLevel(userCredits, creditCost);
   const [formData, setFormData] = useState<NanoBananaEditInput>({
     prompt: 'turn this photo into a character figure',
     image_urls: [],
@@ -47,8 +52,11 @@ export const NanoBananaEditForm: React.FC<NanoBananaEditFormProps> = ({ onSubmit
     setImagePreviews(prev => [...prev, preview]);
 
     try {
-      // Upload to Supabase and get public URL
-      const publicUrl = await uploadImageToSupabase(file);
+      // Upload to KIE.AI and get public URL
+      if (!apiKey) {
+        throw new Error('API Key required');
+      }
+      const publicUrl = await uploadImageToKieAI(file, apiKey);
       
       // Update preview with actual URL
       setImagePreviews(prev => 

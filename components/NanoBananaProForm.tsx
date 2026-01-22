@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import { NanoBananaProInput } from '../types';
 import { Button } from './ui/Button';
 import { Dropzone } from './ui/Dropzone';
-import { uploadImageToSupabase, fileToDataURL } from '../services/imageUpload';
+import { uploadImageToKieAI, fileToDataURL } from '../services/kieFileUpload';
+import { getCreditCost, getCreditWarningLevel } from '../services/credits';
 
 interface NanoBananaProFormProps {
   onSubmit: (input: NanoBananaProInput) => void;
   isLoading: boolean;
+  apiKey?: string;
+  userCredits?: number;
 }
 
 interface ImagePreview {
@@ -16,7 +19,9 @@ interface ImagePreview {
   isUploading: boolean;
 }
 
-export const NanoBananaProForm: React.FC<NanoBananaProFormProps> = ({ onSubmit, isLoading }) => {
+export const NanoBananaProForm: React.FC<NanoBananaProFormProps> = ({ onSubmit, isLoading, apiKey = '', userCredits = 0 }) => {
+  const creditCost = getCreditCost('nano-banana-pro');
+  const creditLevel = getCreditWarningLevel(userCredits, creditCost);
   const [formData, setFormData] = useState<NanoBananaProInput>({
     prompt: 'Comic poster: cool banana hero in shades leaps from sci-fi pad. Six panels: 1) 4K mountain landscape, 2) banana holds page of long multilingual text with auto translation, 3) Gemini 3 hologram for search/knowledge/reasoning, 4) camera UI sliders for angle focus color, 5) frame trio 1:1-9:16, 6) consistent banana poses.',
     image_input: [],
@@ -48,8 +53,11 @@ export const NanoBananaProForm: React.FC<NanoBananaProFormProps> = ({ onSubmit, 
     setImagePreviews(prev => [...prev, preview]);
 
     try {
-      // Upload to Supabase and get public URL
-      const publicUrl = await uploadImageToSupabase(file);
+      // Upload to KIE.AI and get public URL
+      if (!apiKey) {
+        throw new Error('API Key required');
+      }
+      const publicUrl = await uploadImageToKieAI(file, apiKey);
       
       // Update preview with actual URL
       setImagePreviews(prev => 

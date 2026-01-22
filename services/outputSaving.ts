@@ -1,0 +1,254 @@
+/**
+ * Output Saving Service
+ * Saves generated results to Supabase for long-term storage
+ * Supabase becomes the repository for generated content (not input files)
+ */
+
+import { supabase } from './supabase';
+
+export interface SavedOutput {
+  id: string;
+  taskId: string;
+  model: string;
+  prompt: string;
+  outputUrl: string;
+  outputType: 'image' | 'video' | 'text';
+  metadata: Record<string, any>;
+  creditsCost: number;
+  createdAt: string;
+  userId?: string;
+}
+
+/**
+ * Save generated output to Supabase
+ * Stores metadata + URL reference (not the actual file)
+ */
+export const saveOutputToSupabase = async (
+  taskId: string,
+  model: string,
+  prompt: string,
+  outputUrl: string,
+  outputType: 'image' | 'video' | 'text',
+  creditsCost: number,
+  metadata: Record<string, any> = {}
+): Promise<SavedOutput> => {
+  try {
+    const now = new Date().toISOString();
+    const insertData = {
+      task_id: taskId,
+      model,
+      prompt,
+      output_url: outputUrl,
+      output_type: outputType,
+      metadata,
+      credits_cost: creditsCost,
+      created_at: now,
+    };
+
+    // Insert into 'generated_outputs' table
+    const { data, error } = await supabase
+      .from('generated_outputs')
+      .insert([insertData])
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Database error: ${error.message}`);
+    }
+
+    return {
+      id: data.id,
+      taskId: data.task_id,
+      model: data.model,
+      prompt: data.prompt,
+      outputUrl: data.output_url,
+      outputType: data.output_type,
+      metadata: data.metadata,
+      creditsCost: data.credits_cost,
+      createdAt: data.created_at,
+      userId: data.user_id,
+    };
+  } catch (error: any) {
+    throw new Error(`Failed to save output: ${error.message}`);
+  }
+};
+
+/**
+ * Fetch saved outputs for current user
+ */
+export const fetchUserOutputs = async (
+  limit: number = 50,
+  offset: number = 0
+): Promise<SavedOutput[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('generated_outputs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit)
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      throw new Error(`Fetch error: ${error.message}`);
+    }
+
+    return (data || []).map(row => ({
+      id: row.id,
+      taskId: row.task_id,
+      model: row.model,
+      prompt: row.prompt,
+      outputUrl: row.output_url,
+      outputType: row.output_type,
+      metadata: row.metadata,
+      creditsCost: row.credits_cost,
+      createdAt: row.created_at,
+      userId: row.user_id,
+    }));
+  } catch (error: any) {
+    console.error('Failed to fetch outputs:', error);
+    return [];
+  }
+};
+
+/**
+ * Delete saved output
+ */
+export const deleteOutput = async (outputId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('generated_outputs')
+      .delete()
+      .eq('id', outputId);
+
+    if (error) {
+      throw new Error(`Delete error: ${error.message}`);
+    }
+
+    return true;
+  } catch (error: any) {
+    console.error('Failed to delete output:', error);
+    return false;
+  }
+};
+
+/**
+ * Get output by taskId
+ */
+export const getOutputByTaskId = async (taskId: string): Promise<SavedOutput | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('generated_outputs')
+      .select('*')
+      .eq('task_id', taskId)
+      .single();
+
+    if (error) {
+      return null;
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    return {
+      id: data.id,
+      taskId: data.task_id,
+      model: data.model,
+      prompt: data.prompt,
+      outputUrl: data.output_url,
+      outputType: data.output_type,
+      metadata: data.metadata,
+      creditsCost: data.credits_cost,
+      createdAt: data.created_at,
+      userId: data.user_id,
+    };
+  } catch (error: any) {
+    console.error('Failed to get output:', error);
+    return null;
+  }
+};
+
+/**
+ * Get total credits spent by user
+ */
+export const getTotalCreditsCost = async (): Promise<number> => {
+  try {
+    const { data, error } = await supabase
+      .from('generated_outputs')
+      .select('credits_cost');
+
+    if (error) {
+      throw new Error(`Sum error: ${error.message}`);
+    }
+
+    return (data || []).reduce((sum, row) => sum + (row.credits_cost || 0), 0);
+  } catch (error: any) {
+    console.error('Failed to get total credits:', error);
+    return 0;
+  }
+};
+
+/**
+ * Get statistics for user outputs
+ */
+export const getOutputStatistics = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('generated_outputs')
+      .select('output_type, credits_cost');
+
+    if (error) {
+      throw new Error(`Stats error: ${error.message}`);
+    }
+
+    const stats = {
+      totalCount: (data || []).length,
+      imageCount: (data || []).filter(d => d.output_type === 'image').length,
+      videoCount: (data || []).filter(d => d.output_type === 'video').length,
+      totalCreditsCost: (data || []).reduce((sum, row) => sum + (row.credits_cost || 0), 0),
+    };
+
+    return stats;
+  } catch (error: any) {
+    console.error('Failed to get statistics:', error);
+    return {
+      totalCount: 0,
+      imageCount: 0,
+      videoCount: 0,
+      totalCreditsCost: 0,
+    };
+  }
+};
+
+/**
+ * Download output file (creates a download link)
+ */
+export const downloadOutput = async (outputUrl: string, fileName: string): Promise<void> => {
+  try {
+    const response = await fetch(outputUrl);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (error: any) {
+    throw new Error(`Download failed: ${error.message}`);
+  }
+};
+
+/**
+ * Share output (generates shareable URL or prepares for sharing)
+ */
+export const shareOutput = async (outputId: string): Promise<string> => {
+  // This could be extended to create a shareable token or public link
+  // For now, return the output ID that can be used to fetch from database
+  return `${window.location.origin}/shared/${outputId}`;
+};

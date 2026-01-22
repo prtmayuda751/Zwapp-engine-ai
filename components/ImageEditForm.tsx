@@ -2,17 +2,23 @@ import React, { useState } from 'react';
 import { ImageEditInput } from '../types';
 import { Button } from './ui/Button';
 import { Dropzone } from './ui/Dropzone';
-import { uploadAsset } from '../services/supabase';
+import { uploadImageToKieAI, fileToDataURL } from '../services/kieFileUpload';
+import { getCreditCost, getCreditWarningLevel } from '../services/credits';
 
 interface ImageEditFormProps {
   onSubmit: (input: ImageEditInput) => void;
   isLoading: boolean;
+  apiKey?: string;
+  userCredits?: number;
 }
 
-export const ImageEditForm: React.FC<ImageEditFormProps> = ({ onSubmit, isLoading }) => {
+export const ImageEditForm: React.FC<ImageEditFormProps> = ({ onSubmit, isLoading, apiKey = '', userCredits = 0 }) => {
+  const creditCost = getCreditCost('qwen/image-to-image');
+  const creditLevel = getCreditWarningLevel(userCredits, creditCost);
   const [formData, setFormData] = useState<ImageEditInput>({
     prompt: '',
     image_url: '',
+    strength: 0.8,
     negative_prompt: 'blurry, ugly',
     image_size: 'landscape_4_3',
     output_format: 'png',
@@ -40,17 +46,20 @@ export const ImageEditForm: React.FC<ImageEditFormProps> = ({ onSubmit, isLoadin
     // Clear previous URL so user can't submit before new upload finishes
     handleChange('image_url', '');
 
-    // 2. If valid file, upload to Supabase
+    // 2. If valid file, upload to KIE.AI
     if (file) {
         setIsUploading(true);
         try {
-            const publicUrl = await uploadAsset(file);
-            console.log("Supabase URL:", publicUrl);
+            if (!apiKey) {
+              throw new Error('API Key required');
+            }
+            const publicUrl = await uploadImageToKieAI(file, apiKey);
+            console.log("KIE.AI URL:", publicUrl);
             // Replace base64 with real URL
             handleChange('image_url', publicUrl);
         } catch (error: any) {
             console.error("Upload failed", error);
-            setUploadError("Storage Sync Failed: Check configuration.");
+            setUploadError(error.message);
         } finally {
             setIsUploading(false);
         }
@@ -67,8 +76,12 @@ export const ImageEditForm: React.FC<ImageEditFormProps> = ({ onSubmit, isLoadin
     }
 
     const payload = { ...formData };
+    // Remove default/empty values to keep payload clean
     if (payload.seed === -1) {
         delete payload.seed;
+    }
+    if (payload.num_images === '1') {
+        delete payload.num_images;
     }
     onSubmit(payload);
   };
@@ -168,6 +181,23 @@ export const ImageEditForm: React.FC<ImageEditFormProps> = ({ onSubmit, isLoadin
         {showAdvanced && (
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-top-2 duration-300">
                 
+                <div>
+                  <label className={labelClass}>Strength (Denoising)</label>
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="1"
+                      step="0.01" 
+                      value={formData.strength ?? 0.8} 
+                      onChange={(e) => handleChange('strength', parseFloat(e.target.value))}
+                      className="w-full accent-orange-500 h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <span className="text-orange-500 font-mono text-sm w-10">{(formData.strength ?? 0.8).toFixed(2)}</span>
+                  </div>
+                  <div className="text-[10px] text-zinc-500 mt-1 font-mono">1.0 = fully remake, 0.0 = preserve original</div>
+                </div>
+
                 <div>
                   <label className={labelClass}>Acceleration Mode</label>
                   <div className="flex gap-2 mt-1">

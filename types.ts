@@ -32,6 +32,7 @@ export type NanoBananaInput = NanoBananaGenInput | NanoBananaEditInput | NanoBan
 export interface ImageEditInput {
   prompt: string;
   image_url: string;
+  strength?: number;
   negative_prompt?: string;
   image_size?: string;
   output_format?: 'png' | 'jpeg';

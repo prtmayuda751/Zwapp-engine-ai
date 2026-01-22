@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createTask, queryTask } from './services/api';
 import { supabase, signOut } from './services/supabase';
+import { fetchUserCredits, getCreditCost, formatCreditsShort } from './services/credits';
 import { MotionControlInput, NanoBananaInput, ImageEditInput, ZImageInput, LocalTask } from './types';
 import { TaskForm } from './components/TaskForm';
 import { NanoBananaGenForm } from './components/NanoBananaGenForm';
@@ -32,11 +33,16 @@ const App: React.FC = () => {
   const [expandNano, setExpandNano] = useState(false);
   const [nanoBananaType, setNanoBananaType] = useState<NanoBananaType>('gen');
   
+  // Credit State
+  const [totalCredits, setTotalCredits] = useState<number>(0);
+  const [creditsLoading, setCreditsLoading] = useState(false);
+  
   // UI State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Polling Interval Ref
   const pollIntervalRef = useRef<number | null>(null);
+  const creditRefreshRef = useRef<number | null>(null);
 
   // 1. Check for Supabase Session and LocalStorage API Key on Mount
   useEffect(() => {
@@ -60,6 +66,27 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Refresh credits when API key changes
+  useEffect(() => {
+    if (apiKey && session) {
+      refreshCredits();
+      
+      // Set up periodic credit refresh (every 60 seconds)
+      if (creditRefreshRef.current) {
+        clearInterval(creditRefreshRef.current);
+      }
+      creditRefreshRef.current = window.setInterval(() => {
+        refreshCredits();
+      }, 60000);
+    }
+
+    return () => {
+      if (creditRefreshRef.current) {
+        clearInterval(creditRefreshRef.current);
+      }
+    };
+  }, [apiKey, session]);
+
   const addLog = (msg: string) => {
     setLogs(prev => [`> ${msg}`, ...prev].slice(0, 50));
   };
@@ -74,6 +101,24 @@ const App: React.FC = () => {
       await signOut();
       addLog('Session Terminated.');
       setSession(null);
+      setTotalCredits(0);
+  };
+
+  const refreshCredits = async () => {
+    if (!apiKey) return;
+    
+    setCreditsLoading(true);
+    try {
+      const credits = await fetchUserCredits(apiKey);
+      setTotalCredits(credits);
+      if (credits < getCreditCost('google/nano-banana')) {
+        addLog('⚠️  WARNING: Low credit balance. Please top up.');
+      }
+    } catch (error: any) {
+      console.error('Failed to refresh credits:', error);
+    } finally {
+      setCreditsLoading(false);
+    }
   };
 
   const handleCreateTask = async (input: MotionControlInput | NanoBananaInput | ImageEditInput | ZImageInput) => {
@@ -90,7 +135,7 @@ const App: React.FC = () => {
     else if (activeModule === 'nano-banana-gen') modelName = 'google/nano-banana';
     else if (activeModule === 'nano-banana-edit') modelName = 'google/nano-banana-edit';
     else if (activeModule === 'nano-banana-pro') modelName = 'nano-banana-pro';
-    else if (activeModule === 'image-edit') modelName = 'qwen/image-edit';
+    else if (activeModule === 'image-edit') modelName = 'qwen/image-to-image';
     else if (activeModule === 'z-image') modelName = 'z-image';
 
     addLog(`Initiating generation sequence [${modelName}]...`);
@@ -242,6 +287,21 @@ const App: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-4">
+                {/* Credits Display */}
+                <div className="hidden lg:flex items-center gap-2 border-r border-zinc-800 pr-4">
+                    <div className="relative">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                            <span className="text-xs font-bold text-white">₵</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div className="text-xs text-white font-bold font-mono">
+                            {creditsLoading ? 'LOADING...' : formatCreditsShort(totalCredits)}
+                        </div>
+                        <div className="text-[10px] text-zinc-600 font-mono uppercase">BALANCE</div>
+                    </div>
+                </div>
+
                 {/* API Status */}
                 <div className="hidden md:flex items-center gap-2 border-r border-zinc-800 pr-4">
                     <div className={`w-2 h-2 rounded-full ${apiKey ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-red-500 animate-pulse'}`}></div>
@@ -399,19 +459,19 @@ const App: React.FC = () => {
                 </div>
 
                 {activeModule === 'motion-control' && (
-                    <TaskForm onSubmit={handleCreateTask} isLoading={isSubmitting} />
+                    <TaskForm onSubmit={handleCreateTask} isLoading={isSubmitting} apiKey={apiKey} userCredits={totalCredits} />
                 )}
                 {activeModule === 'nano-banana-gen' && (
-                    <NanoBananaGenForm onSubmit={handleCreateTask} isLoading={isSubmitting} />
+                    <NanoBananaGenForm onSubmit={handleCreateTask} isLoading={isSubmitting} apiKey={apiKey} userCredits={totalCredits} />
                 )}
                 {activeModule === 'nano-banana-edit' && (
-                    <NanoBananaEditForm onSubmit={handleCreateTask} isLoading={isSubmitting} />
+                    <NanoBananaEditForm onSubmit={handleCreateTask} isLoading={isSubmitting} apiKey={apiKey} userCredits={totalCredits} />
                 )}
                 {activeModule === 'nano-banana-pro' && (
-                    <NanoBananaProForm onSubmit={handleCreateTask} isLoading={isSubmitting} />
+                    <NanoBananaProForm onSubmit={handleCreateTask} isLoading={isSubmitting} apiKey={apiKey} userCredits={totalCredits} />
                 )}
                 {activeModule === 'image-edit' && (
-                    <ImageEditForm onSubmit={handleCreateTask} isLoading={isSubmitting} />
+                    <ImageEditForm onSubmit={handleCreateTask} isLoading={isSubmitting} apiKey={apiKey} userCredits={totalCredits} />
                 )}
                 {activeModule === 'z-image' && (
                     <ZImageForm onSubmit={handleCreateTask} isLoading={isSubmitting} />
