@@ -90,17 +90,19 @@ const App: React.FC = () => {
       if (response.code === 200) {
         addLog(`Task created successfully. ID: ${response.data.taskId}`);
         
-        // Fetch initial info to populate the record correctly
-        const initialInfo = await queryTask(apiKey, response.data.taskId);
-        
+        // Buat task lokal awal
         const newTask: LocalTask = {
-          ...initialInfo.data,
-          progress: 0,
-          isRead: false
+            taskId: response.data.taskId,
+            model: modelName,
+            state: 'waiting',
+            param: JSON.stringify(input),
+            createTime: Date.now(),
+            progress: 0,
+            isRead: false
         };
 
         setTasks(prev => [newTask, ...prev]);
-        setSelectedTaskId(response.data.taskId); // Auto-select new task
+        setSelectedTaskId(response.data.taskId); 
       } else {
         addLog(`Error: ${response.msg}`);
       }
@@ -111,24 +113,19 @@ const App: React.FC = () => {
     }
   };
 
-  // Central Polling Logic for All Tasks
+  // Central Polling Logic
   useEffect(() => {
-    // Only poll if logged in and has key
     if (!session || !apiKey) return;
 
-    // Determine which tasks need polling (waiting state)
-    const hasPendingTasks = tasks.some(t => t.state === 'waiting');
-
-    if (hasPendingTasks && !pollIntervalRef.current) {
-        addLog('Background monitoring active...');
-        
+    // Background Progress Simulator (Visual Only)
+    if (!pollIntervalRef.current) {
         pollIntervalRef.current = window.setInterval(async () => {
           setTasks(prevTasks => {
             const pendingTasks = prevTasks.filter(t => t.state === 'waiting');
             return prevTasks.map(task => {
                if (task.state === 'waiting') {
-                 // Simulate progress up to 90%
-                 const increment = Math.random() * 5;
+                 // Slow down progress as it gets closer to 90%
+                 const increment = Math.max(0.1, (90 - task.progress) / 20);
                  return { 
                    ...task, 
                    progress: Math.min(task.progress + increment, 90),
@@ -138,10 +135,11 @@ const App: React.FC = () => {
                return task;
             });
           });
-        }, 2000);
+        }, 1000);
     }
 
-    const intervalId = window.setInterval(async () => {
+    // Actual API Polling
+    const apiPollId = window.setInterval(async () => {
         const tasksToPoll = tasks.filter(t => t.state === 'waiting');
         if (tasksToPoll.length === 0) return;
 
@@ -151,20 +149,23 @@ const App: React.FC = () => {
                 if (res.code === 200) {
                     return { taskId: task.taskId, data: res.data };
                 }
-            } catch (e) {
-                console.error(e);
+            } catch (e: any) {
+                // Log error only once per few seconds to avoid spamming
+                if (Math.random() > 0.8) {
+                   console.error(`Polling error for ${task.taskId}:`, e.message);
+                }
             }
             return null;
         }));
 
+        // Update State
         setTasks(prev => prev.map(t => {
             const update = updates.find(u => u && u.taskId === t.taskId);
-            const waitingList = prev.filter(x => x.state === 'waiting');
-            const queuePos = t.state === 'waiting' ? waitingList.findIndex(x => x.taskId === t.taskId) + 1 : undefined;
-
+            
             if (update && update.data) {
                 const newState = update.data.state;
-                const newProgress = (newState === 'success' || newState === 'fail') ? 100 : Math.min(t.progress + (Math.random() * 2), 95);
+                // If success/fail, jump to 100%. If waiting, keep simulated progress.
+                const newProgress = (newState === 'success' || newState === 'fail') ? 100 : t.progress;
                 
                 if (newState !== t.state) {
                     addLog(`Task ${t.taskId.slice(-4)} updated: ${t.state} -> ${newState}`);
@@ -175,23 +176,15 @@ const App: React.FC = () => {
                     ...update.data,
                     state: newState,
                     progress: newProgress,
-                    queuePosition: queuePos
                 };
-            }
-            if (t.state === 'waiting') {
-                 return {
-                    ...t,
-                    progress: Math.min(t.progress + (Math.random() * 2), 95),
-                    queuePosition: queuePos
-                 };
             }
             return t;
         }));
 
-    }, 3000);
+    }, 3000); // Check every 3 seconds
 
     return () => {
-        clearInterval(intervalId);
+        clearInterval(apiPollId);
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
   }, [tasks, apiKey, session]);

@@ -24,6 +24,7 @@ export const ImageEditForm: React.FC<ImageEditFormProps> = ({ onSubmit, isLoadin
     num_images: '1'
   });
 
+  const [previewUrl, setPreviewUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -34,8 +35,10 @@ export const ImageEditForm: React.FC<ImageEditFormProps> = ({ onSubmit, isLoadin
 
   const handleFileSelect = async (previewBase64: string, file?: File) => {
     // 1. Set preview immediately for UI
-    handleChange('image_url', previewBase64);
+    setPreviewUrl(previewBase64);
     setUploadError(null);
+    // Clear previous URL so user can't submit before new upload finishes
+    handleChange('image_url', '');
 
     // 2. If valid file, upload to Supabase
     if (file) {
@@ -48,8 +51,6 @@ export const ImageEditForm: React.FC<ImageEditFormProps> = ({ onSubmit, isLoadin
         } catch (error: any) {
             console.error("Upload failed", error);
             setUploadError("Storage Sync Failed: Check configuration.");
-            // Keep base64 as fallback or clear? usually API needs URL
-            // Let's keep it but warn user
         } finally {
             setIsUploading(false);
         }
@@ -58,6 +59,13 @@ export const ImageEditForm: React.FC<ImageEditFormProps> = ({ onSubmit, isLoadin
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Safety check: Don't send Base64 strings to API
+    if (formData.image_url.startsWith('data:')) {
+        setUploadError("WAITING FOR UPLOAD...");
+        return;
+    }
+
     const payload = { ...formData };
     if (payload.seed === -1) {
         delete payload.seed;
@@ -84,9 +92,12 @@ export const ImageEditForm: React.FC<ImageEditFormProps> = ({ onSubmit, isLoadin
             label="Source Image (Required)"
             subLabel="Supported: JPG, PNG, WEBP (Max 10MB)"
             accept="image/png, image/jpeg, image/webp"
-            value={formData.image_url}
+            value={previewUrl}
             onFileSelect={handleFileSelect}
-            onTextChange={(val) => handleChange('image_url', val)}
+            onTextChange={(val) => {
+                setPreviewUrl(val);
+                handleChange('image_url', val); // Direct URL input is fine
+            }}
             isUploading={isUploading}
         />
         <div className="mt-1 flex justify-between items-center">
