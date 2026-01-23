@@ -3,18 +3,14 @@ import { ImageEditInput } from '../types';
 import { Button } from './ui/Button';
 import { Dropzone } from './ui/Dropzone';
 import { uploadImageToKieAI, fileToDataURL } from '../services/kieFileUpload';
-import { getCreditCost, getCreditWarningLevel } from '../services/credits';
 
 interface ImageEditFormProps {
   onSubmit: (input: ImageEditInput) => void;
   isLoading: boolean;
   apiKey?: string;
-  userCredits?: number;
 }
 
-export const ImageEditForm: React.FC<ImageEditFormProps> = ({ onSubmit, isLoading, apiKey = '', userCredits = 0 }) => {
-  const creditCost = getCreditCost('qwen/image-to-image');
-  const creditLevel = getCreditWarningLevel(userCredits, creditCost);
+export const ImageEditForm: React.FC<ImageEditFormProps> = ({ onSubmit, isLoading, apiKey = '' }) => {
   const [formData, setFormData] = useState<ImageEditInput>({
     prompt: '',
     image_url: '',
@@ -98,24 +94,6 @@ export const ImageEditForm: React.FC<ImageEditFormProps> = ({ onSubmit, isLoadin
         <div className="w-3 h-3 bg-orange-500 animate-pulse"></div>
         <h2 className="text-xl font-bold uppercase tracking-widest text-white">Image Edit Matrix</h2>
       </div>
-
-      {creditLevel === 'danger' && (
-        <div className="bg-red-950/30 border border-red-700 p-3 rounded text-xs text-red-300 font-mono">
-          ⚠️ INSUFFICIENT CREDITS: You need {creditCost} credits but only have {userCredits}.
-        </div>
-      )}
-
-      {creditLevel === 'warning' && (
-        <div className="bg-yellow-950/30 border border-yellow-700 p-3 rounded text-xs text-yellow-300 font-mono">
-          ⚠️ LOW CREDITS: You have {userCredits} credits. Cost: {creditCost} credits.
-        </div>
-      )}
-
-      {creditLevel === 'safe' && creditCost > 0 && (
-        <div className="bg-green-950/30 border border-green-700 p-3 rounded text-xs text-green-300 font-mono">
-          ✓ Credits OK: {userCredits} available. Cost: {creditCost} credits.
-        </div>
-      )}
 
       {/* Primary Inputs */}
       <div>

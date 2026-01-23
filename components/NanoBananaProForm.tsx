@@ -3,13 +3,11 @@ import { NanoBananaProInput } from '../types';
 import { Button } from './ui/Button';
 import { Dropzone } from './ui/Dropzone';
 import { uploadImageToKieAI, fileToDataURL } from '../services/kieFileUpload';
-import { getCreditCost, getCreditWarningLevel } from '../services/credits';
 
 interface NanoBananaProFormProps {
   onSubmit: (input: NanoBananaProInput) => void;
   isLoading: boolean;
   apiKey?: string;
-  userCredits?: number;
 }
 
 interface ImagePreview {
@@ -19,9 +17,7 @@ interface ImagePreview {
   isUploading: boolean;
 }
 
-export const NanoBananaProForm: React.FC<NanoBananaProFormProps> = ({ onSubmit, isLoading, apiKey = '', userCredits = 0 }) => {
-  const creditCost = getCreditCost('nano-banana-pro');
-  const creditLevel = getCreditWarningLevel(userCredits, creditCost);
+export const NanoBananaProForm: React.FC<NanoBananaProFormProps> = ({ onSubmit, isLoading, apiKey = '' }) => {
   const [formData, setFormData] = useState<NanoBananaProInput>({
     prompt: 'Comic poster: cool banana hero in shades leaps from sci-fi pad. Six panels: 1) 4K mountain landscape, 2) banana holds page of long multilingual text with auto translation, 3) Gemini 3 hologram for search/knowledge/reasoning, 4) camera UI sliders for angle focus color, 5) frame trio 1:1-9:16, 6) consistent banana poses.',
     image_input: [],
@@ -122,24 +118,6 @@ export const NanoBananaProForm: React.FC<NanoBananaProFormProps> = ({ onSubmit, 
       <div className="bg-zinc-800/50 border border-zinc-700 p-3 rounded text-xs text-zinc-400 font-mono">
         Advanced generation with reference images (up to 8 images, max 30MB each)
       </div>
-
-      {creditLevel === 'danger' && (
-        <div className="bg-red-950/30 border border-red-700 p-3 rounded text-xs text-red-300 font-mono">
-          ⚠️ INSUFFICIENT CREDITS: You need {creditCost} credits but only have {userCredits}.
-        </div>
-      )}
-
-      {creditLevel === 'warning' && (
-        <div className="bg-yellow-950/30 border border-yellow-700 p-3 rounded text-xs text-yellow-300 font-mono">
-          ⚠️ LOW CREDITS: You have {userCredits} credits. Cost: {creditCost} credits.
-        </div>
-      )}
-
-      {creditLevel === 'safe' && creditCost > 0 && (
-        <div className="bg-green-950/30 border border-green-700 p-3 rounded text-xs text-green-300 font-mono">
-          ✓ Credits OK: {userCredits} available. Cost: {creditCost} credits.
-        </div>
-      )}
 
       <div>
         <label className={labelClass}>Prompt *</label>

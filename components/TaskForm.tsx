@@ -3,7 +3,6 @@ import { MotionControlInput } from '../types';
 import { Button } from './ui/Button';
 import { Dropzone } from './ui/Dropzone';
 import { uploadImageToKieAI, uploadVideoToKieAI, fileToDataURL } from '../services/kieFileUpload';
-import { getCreditCost, getCreditWarningLevel } from '../services/credits';
 
 interface ImagePreview {
   dataUrl: string;
@@ -23,10 +22,9 @@ interface TaskFormProps {
   onSubmit: (input: MotionControlInput) => void;
   isLoading: boolean;
   apiKey?: string;
-  userCredits?: number;
 }
 
-export const TaskForm: React.FC<TaskFormProps> = ({ onSubmit, isLoading, apiKey = '', userCredits = 0 }) => {
+export const TaskForm: React.FC<TaskFormProps> = ({ onSubmit, isLoading, apiKey = '' }) => {
   const [formData, setFormData] = useState<MotionControlInput>({
     prompt: 'The cartoon character is dancing.',
     input_urls: [],
@@ -40,9 +38,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onSubmit, isLoading, apiKey 
   const [uploadError, setUploadError] = useState<string>('');
   const [showSaveOption, setShowSaveOption] = useState(false);
   const [saveOutput, setSaveOutput] = useState(false);
-
-  const creditCost = getCreditCost('kling-2.6/motion-control');
-  const creditLevel = getCreditWarningLevel(userCredits, creditCost);
 
   const handleChange = (field: keyof MotionControlInput, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -125,7 +120,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onSubmit, isLoading, apiKey 
   };
 
   const isUploading = imagePreviews.some(p => p.isUploading) || videoPreviews.some(p => p.isUploading);
-  const canSubmit = formData.input_urls.length > 0 && formData.video_urls.length > 0 && !isUploading && userCredits >= creditCost;
+  const canSubmit = formData.input_urls.length > 0 && formData.video_urls.length > 0 && !isUploading;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,24 +142,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onSubmit, isLoading, apiKey 
           <div className="w-3 h-3 bg-orange-500 animate-pulse"></div>
           <h2 className="text-xl font-bold uppercase tracking-widest text-white">Task Configuration</h2>
         </div>
-        <div className={`text-xs font-mono px-3 py-1 rounded border ${
-          creditLevel === 'danger' ? 'border-red-500 bg-red-500/10 text-red-400' :
-          creditLevel === 'warning' ? 'border-amber-500 bg-amber-500/10 text-amber-400' :
-          'border-green-500 bg-green-500/10 text-green-400'
-        }`}>
-          {creditCost} credits
-        </div>
       </div>
 
       {uploadError && (
         <div className="bg-red-900/30 border border-red-700/50 rounded p-3">
           <p className="text-red-400 text-sm font-mono">{uploadError}</p>
-        </div>
-      )}
-
-      {creditLevel === 'danger' && (
-        <div className="bg-red-900/30 border border-red-700/50 rounded p-3">
-          <p className="text-red-400 text-sm font-mono">❌ Insufficient credits for this operation</p>
         </div>
       )}
 
@@ -303,7 +285,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onSubmit, isLoading, apiKey 
           isLoading={isLoading || isUploading}
           disabled={!canSubmit}
         >
-          {!canSubmit ? (isUploading ? 'UPLOADING...' : creditLevel === 'danger' ? 'INSUFFICIENT CREDITS' : 'SELECT IMAGE & VIDEO') : 'INITIATE SEQUENCE'}
+          {!canSubmit ? (isUploading ? 'UPLOADING...' : 'SELECT IMAGE & VIDEO') : 'INITIATE SEQUENCE'}
         </Button>
       </div>
     </form>
