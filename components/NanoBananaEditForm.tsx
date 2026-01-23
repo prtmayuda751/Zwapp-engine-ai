@@ -3,11 +3,13 @@ import { NanoBananaEditInput } from '../types';
 import { Button } from './ui/Button';
 import { Dropzone } from './ui/Dropzone';
 import { uploadImageToKieAI, fileToDataURL } from '../services/kieFileUpload';
+import { getCreditCost, getCreditWarningLevel } from '../services/credits';
 
 interface NanoBananaEditFormProps {
   onSubmit: (input: NanoBananaEditInput) => void;
   isLoading: boolean;
   apiKey?: string;
+  userCredits?: number;
 }
 
 interface ImagePreview {
@@ -17,7 +19,9 @@ interface ImagePreview {
   isUploading: boolean;
 }
 
-export const NanoBananaEditForm: React.FC<NanoBananaEditFormProps> = ({ onSubmit, isLoading, apiKey = '' }) => {
+export const NanoBananaEditForm: React.FC<NanoBananaEditFormProps> = ({ onSubmit, isLoading, apiKey = '', userCredits = 0 }) => {
+  const creditCost = getCreditCost('google/nano-banana-edit');
+  const creditLevel = getCreditWarningLevel(userCredits, creditCost);
   const [formData, setFormData] = useState<NanoBananaEditInput>({
     prompt: 'turn this photo into a character figure',
     image_urls: [],
@@ -120,6 +124,24 @@ export const NanoBananaEditForm: React.FC<NanoBananaEditFormProps> = ({ onSubmit
       <div className="bg-zinc-800/50 border border-zinc-700 p-3 rounded text-xs text-zinc-400 font-mono">
         Edit and transform images using AI (up to 10 images, max 10MB each)
       </div>
+
+      {creditLevel === 'danger' && (
+        <div className="bg-red-950/30 border border-red-700 p-3 rounded text-xs text-red-300 font-mono">
+          ⚠️ INSUFFICIENT CREDITS: You need {creditCost} credits but only have {userCredits}.
+        </div>
+      )}
+
+      {creditLevel === 'warning' && (
+        <div className="bg-yellow-950/30 border border-yellow-700 p-3 rounded text-xs text-yellow-300 font-mono">
+          ⚠️ LOW CREDITS: You have {userCredits} credits. Cost: {creditCost} credits.
+        </div>
+      )}
+
+      {creditLevel === 'safe' && creditCost > 0 && (
+        <div className="bg-green-950/30 border border-green-700 p-3 rounded text-xs text-green-300 font-mono">
+          ✓ Credits OK: {userCredits} available. Cost: {creditCost} credits.
+        </div>
+      )}
 
       <div>
         <label className={labelClass}>Prompt *</label>

@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import { NanoBananaGenInput } from '../types';
 import { Button } from './ui/Button';
+import { getCreditCost, getCreditWarningLevel } from '../services/credits';
 
 interface NanoBananaGenFormProps {
   onSubmit: (input: NanoBananaGenInput) => void;
   isLoading: boolean;
   apiKey?: string;
+  userCredits?: number;
 }
 
-export const NanoBananaGenForm: React.FC<NanoBananaGenFormProps> = ({ onSubmit, isLoading, apiKey = '' }) => {
+export const NanoBananaGenForm: React.FC<NanoBananaGenFormProps> = ({ onSubmit, isLoading, apiKey = '', userCredits = 0 }) => {
+  const creditCost = getCreditCost('google/nano-banana');
+  const creditLevel = getCreditWarningLevel(userCredits, creditCost);
   const [formData, setFormData] = useState<NanoBananaGenInput>({
     prompt: 'A surreal painting of a giant banana floating in space, stars and galaxies in the background, vibrant colors, digital art',
     output_format: 'png',
@@ -47,6 +51,24 @@ export const NanoBananaGenForm: React.FC<NanoBananaGenFormProps> = ({ onSubmit, 
       <div className="bg-zinc-800/50 border border-zinc-700 p-3 rounded text-xs text-zinc-400 font-mono">
         Generate images from text descriptions
       </div>
+
+      {creditLevel === 'danger' && (
+        <div className="bg-red-950/30 border border-red-700 p-3 rounded text-xs text-red-300 font-mono">
+          ⚠️ INSUFFICIENT CREDITS: You need {creditCost} credits but only have {userCredits}.
+        </div>
+      )}
+
+      {creditLevel === 'warning' && (
+        <div className="bg-yellow-950/30 border border-yellow-700 p-3 rounded text-xs text-yellow-300 font-mono">
+          ⚠️ LOW CREDITS: You have {userCredits} credits. Cost: {creditCost} credits.
+        </div>
+      )}
+
+      {creditLevel === 'safe' && creditCost > 0 && (
+        <div className="bg-green-950/30 border border-green-700 p-3 rounded text-xs text-green-300 font-mono">
+          ✓ Credits OK: {userCredits} available. Cost: {creditCost} credits.
+        </div>
+      )}
 
       <div>
         <label className={labelClass}>Prompt *</label>
