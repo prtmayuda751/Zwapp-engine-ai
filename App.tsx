@@ -95,16 +95,38 @@ const App: React.FC = () => {
       setApiKey(key);
       localStorage.setItem('kie_api_key', key);
       addLog('System Configuration Updated: API Key Saved.');
+      
       // Immediately refresh credits after saving API key
       setCreditsLoading(true);
-      fetchUserCredits(key).then(credits => {
-        setTotalCredits(credits);
-        setCreditsLoading(false);
-        addLog(`Credits synchronized: ${credits} available.`);
-      }).catch(error => {
-        console.error('Failed to sync credits:', error);
-        setCreditsLoading(false);
-      });
+      let retries = 0;
+      const maxRetries = 2;
+      
+      const attemptFetch = async (): Promise<void> => {
+        try {
+          const credits = await fetchUserCredits(key);
+          setTotalCredits(credits);
+          setCreditsLoading(false);
+          
+          if (credits === 0) {
+            addLog('⚠️ Credits: 0 - Verify API key is valid');
+          } else {
+            addLog(`✓ Credits synchronized: ${credits} available.`);
+          }
+        } catch (error: any) {
+          if (retries < maxRetries) {
+            retries++;
+            console.log(`[Sync] Retry attempt ${retries}/${maxRetries}...`);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            return attemptFetch();
+          }
+          
+          console.error('Failed to sync credits:', error);
+          setCreditsLoading(false);
+          addLog('❌ Failed to verify API key. Check validity and try again.');
+        }
+      };
+      
+      attemptFetch();
   };
 
   const handleLogout = async () => {
@@ -118,14 +140,41 @@ const App: React.FC = () => {
     if (!apiKey) return;
     
     setCreditsLoading(true);
+    let retries = 0;
+    const maxRetries = 2;
+    
+    const attempt = async (): Promise<number> => {
+      try {
+        const credits = await fetchUserCredits(apiKey);
+        return credits;
+      } catch (error: any) {
+        if (retries < maxRetries) {
+          retries++;
+          console.log(`[Credits] Retry attempt ${retries}/${maxRetries}...`);
+          // Wait 1 second before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          return attempt();
+        }
+        throw error;
+      }
+    };
+
     try {
-      const credits = await fetchUserCredits(apiKey);
+      const credits = await attempt();
       setTotalCredits(credits);
-      if (credits < getCreditCost('google/nano-banana')) {
-        addLog('⚠️  WARNING: Low credit balance. Please top up.');
+      
+      if (credits === 0) {
+        console.warn('[Credits] Credit balance is 0 - check API key validity');
+        addLog('⚠️ WARNING: Could not retrieve credit balance. Check API key.');
+      } else if (credits < getCreditCost('google/nano-banana')) {
+        addLog('⚠️ WARNING: Low credit balance. Current: ' + credits);
+      } else {
+        console.log('[Credits] Balance updated:', credits);
       }
     } catch (error: any) {
-      console.error('Failed to refresh credits:', error);
+      console.error('[Credits] Failed to fetch credits after retries:', error);
+      setTotalCredits(0);
+      addLog('❌ Failed to sync credits. Check your API key and internet connection.');
     } finally {
       setCreditsLoading(false);
     }
