@@ -12,8 +12,9 @@ import { StatusTerminal } from './components/StatusTerminal';
 import { QueueList } from './components/QueueList';
 import { AuthForm } from './components/AuthForm';
 import { SettingsModal } from './components/SettingsModal';
+import UGCOrchestrationWorkspace from './components/UGC/UGCOrchestrationWorkspace';
 
-type ModuleType = 'motion-control' | 'nano-banana-gen' | 'nano-banana-edit' | 'nano-banana-pro' | 'image-edit' | 'z-image';
+type ModuleType = 'motion-control' | 'nano-banana-gen' | 'nano-banana-edit' | 'nano-banana-pro' | 'image-edit' | 'z-image' | 'ugc';
 type NanoBananaType = 'gen' | 'edit' | 'pro';
 
 const App: React.FC = () => {
@@ -396,6 +397,18 @@ const App: React.FC = () => {
                             </button>
                         </div>
                     )}
+
+                    {/* UGC AI Studio - New Menu Option */}
+                    <button
+                        onClick={() => setActiveModule('ugc')}
+                        className={`w-full py-2 text-xs font-bold uppercase tracking-wider transition-all text-center ${
+                            activeModule === 'ugc' 
+                            ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white border border-purple-500 shadow-lg' 
+                            : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                    >
+                        🎬 UGC AI Studio
+                    </button>
                 </div>
 
                 {activeModule === 'motion-control' && (
@@ -415,6 +428,11 @@ const App: React.FC = () => {
                 )}
                 {activeModule === 'z-image' && (
                     <ZImageForm onSubmit={handleCreateTask} isLoading={isSubmitting} apiKey={apiKey} />
+                )}
+                {activeModule === 'ugc' && (
+                    <div className="w-full">
+                        <UGCOrchestrationWorkspace />
+                    </div>
                 )}
                 </div>
 
