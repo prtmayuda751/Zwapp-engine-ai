@@ -1,69 +1,73 @@
 /**
- * KIE.AI File Upload Service
- * Replaces Supabase for input file uploads
- * Uses KIE.AI's native file upload: https://kieai.redpandaai.co/api/file-url-upload
- * Files are temporary (3 days retention) - perfect for processing pipelines
+ * KIE.AI File Upload Service with Supabase Backend
+ * 
+ * FLOW:
+ * 1. Upload file to Supabase → get public URL
+ * 2. Send public URL to KIE.AI for processing
+ * 3. KIE.AI fetches file from Supabase URL
  */
 
+import { supabase } from './supabase';
+
 /**
- * Convert File to public URL via KIE.AI
- * Uploads file and returns a URL that can be used with any KIE.AI API
+ * Convert File to public URL via Supabase
+ * Uploads file to Supabase and returns a public URL that KIE.AI can access
  */
-export const uploadFileToKieAI = async (
+export const uploadFileToSupabaseGetUrl = async (
   file: File,
-  apiKey: string,
   uploadPath: string = 'uploads'
 ): Promise<string> => {
   try {
-    // First, we need to upload the file to get a temporary URL
-    // Since KIE.AI file upload requires a URL source, we'll convert file to blob URL
-    // then use that, or we can upload directly to Supabase and use the URL with KIE.AI
-    
-    // For now, we'll create a workaround:
-    // 1. Create a FormData with the file
-    // 2. Upload to KIE.AI's file upload endpoint
-    
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('uploadPath', uploadPath);
-    formData.append('fileName', file.name);
-    
-    const response = await fetch('https://kieai.redpandaai.co/api/file-url-upload', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.msg || `HTTP ${response.status}`);
+    const user = await supabase.auth.getUser();
+    if (!user.data.user) {
+      throw new Error('Authentication required for upload');
     }
 
-    const data = await response.json();
-    if (!data.success || !data.data?.fileUrl) {
-      throw new Error('File upload failed: No URL returned');
+    // 1. Generate unique filename
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user.data.user.id}/${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+    const filePath = `${uploadPath}/${fileName}`;
+
+    console.log('[Upload] Uploading to Supabase:', filePath);
+
+    // 2. Upload to Supabase 'kie-assets' bucket
+    const { data, error: uploadError } = await supabase.storage
+      .from('kie-assets')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (uploadError) {
+      throw uploadError;
     }
 
-    return data.data.fileUrl;
+    // 3. Get Public URL from Supabase
+    const { data: urlData } = supabase.storage
+      .from('kie-assets')
+      .getPublicUrl(filePath);
+
+    const publicUrl = urlData.publicUrl;
+    console.log('[Upload] Supabase URL generated:', publicUrl.substring(0, 50) + '...');
+
+    return publicUrl;
   } catch (error: any) {
-    throw new Error(`KIE.AI upload failed: ${error.message}`);
+    throw new Error(`Supabase Upload Failed: ${error.message}`);
   }
 };
 
 /**
- * Upload image file to KIE.AI
- * Validates file type and size before uploading
+ * Upload image file to Supabase, then get public URL
+ * Returns URL that KIE.AI can fetch and process
  */
 export const uploadImageToKieAI = async (
   file: File,
-  apiKey: string
+  apiKey: string // apiKey kept for backward compatibility but not used here
 ): Promise<string> => {
   // Validate file type
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   if (!allowedTypes.includes(file.type)) {
-    throw new Error(`Invalid file type: ${file.type}. Allowed: JPG, PNG, WEBP`);
+    throw new Error(`Invalid file type: ${file.type}. Allowed: JPG, PNG, WEBP, GIF`);
   }
 
   // Validate file size (10MB for most image models)
@@ -72,21 +76,22 @@ export const uploadImageToKieAI = async (
     throw new Error(`File too large: ${(file.size / 1024 / 1024).toFixed(2)}MB. Max: 10MB`);
   }
 
-  return uploadFileToKieAI(file, apiKey, 'images');
+  console.log('[Upload] Starting image upload:', file.name);
+  return uploadFileToSupabaseGetUrl(file, 'images');
 };
 
 /**
- * Upload video file to KIE.AI
- * Validates file type and size before uploading
+ * Upload video file to Supabase, then get public URL
+ * Returns URL that KIE.AI can fetch and process
  */
 export const uploadVideoToKieAI = async (
   file: File,
-  apiKey: string
+  apiKey: string // apiKey kept for backward compatibility but not used here
 ): Promise<string> => {
   // Validate file type
-  const allowedTypes = ['video/mp4', 'video/quicktime', 'video/x-matroska', 'video/x-msvideo'];
+  const allowedTypes = ['video/mp4', 'video/quicktime', 'video/x-matroska', 'video/x-msvideo', 'video/webm'];
   if (!allowedTypes.includes(file.type)) {
-    throw new Error(`Invalid file type: ${file.type}. Allowed: MP4, MOV, MKV, AVI`);
+    throw new Error(`Invalid file type: ${file.type}. Allowed: MP4, MOV, MKV, AVI, WEBM`);
   }
 
   // Validate file size (100MB for videos)
@@ -95,19 +100,22 @@ export const uploadVideoToKieAI = async (
     throw new Error(`File too large: ${(file.size / 1024 / 1024).toFixed(2)}MB. Max: 100MB`);
   }
 
-  return uploadFileToKieAI(file, apiKey, 'videos');
+  console.log('[Upload] Starting video upload:', file.name);
+  return uploadFileToSupabaseGetUrl(file, 'videos');
 };
 
 /**
- * Upload multiple images concurrently to KIE.AI
+ * Upload multiple images concurrently to Supabase, get public URLs
  */
 export const uploadImagesToKieAI = async (
   files: File[],
-  apiKey: string
+  apiKey: string // kept for backward compatibility
 ): Promise<string[]> => {
   try {
+    console.log('[Upload] Uploading', files.length, 'images');
     const uploadPromises = files.map(file => uploadImageToKieAI(file, apiKey));
     const urls = await Promise.all(uploadPromises);
+    console.log('[Upload] Successfully uploaded', urls.length, 'images');
     return urls;
   } catch (error: any) {
     throw new Error(`Batch upload failed: ${error.message}`);
@@ -115,15 +123,17 @@ export const uploadImagesToKieAI = async (
 };
 
 /**
- * Upload multiple videos concurrently to KIE.AI
+ * Upload multiple videos concurrently to Supabase, get public URLs
  */
 export const uploadVideosToKieAI = async (
   files: File[],
-  apiKey: string
+  apiKey: string // kept for backward compatibility
 ): Promise<string[]> => {
   try {
+    console.log('[Upload] Uploading', files.length, 'videos');
     const uploadPromises = files.map(file => uploadVideoToKieAI(file, apiKey));
     const urls = await Promise.all(uploadPromises);
+    console.log('[Upload] Successfully uploaded', urls.length, 'videos');
     return urls;
   } catch (error: any) {
     throw new Error(`Batch upload failed: ${error.message}`);
